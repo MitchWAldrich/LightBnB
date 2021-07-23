@@ -122,12 +122,57 @@ exports.getAllReservations = getAllReservations;
  * @return {Promise<[{}]>}  A promise to the properties.
  */
 const getAllProperties = function(options, limit = 10) {
-  const queryString = `
-  SELECT *
+  // const { city, owner_id, minimum_price_per_night, maximum_price_per_night, minimum_rating } = options;
+  const values = [];
+
+  let queryString = `
+  SELECT properties.*
   FROM properties
-  LIMIT $1
+  JOIN property_reviews ON property_id = properties.id
   `;
-  return pool.query(queryString, [limit])
+  if (options.city) {
+    values.push(`%${options.city}%`);
+    queryString += `WHERE city LIKE $${values.length}`;
+  }
+
+  if (options.owner_id) {
+    values.push(`%${options.owner_id}%`);
+    queryString += ` AND owner_id = $${values.length}`;
+  }
+
+  if (options.minimum_price_per_night && options.maximum_price_per_night) {
+    values.push(`${options.minimum_price_per_night}`);
+    values.push(`${options.maximum_price_per_night}`);
+    queryString += ` AND cost_per_night >= $${(values.length - 1)} AND cost_per_night <= $${values.length}`;
+  }
+  
+  if (options.minimum_rating) {
+    values.push(`${parseInt(options.minimum_rating)}`);
+    queryString += ` AND rating >= $${values.length}`;
+  }
+
+  values.push(limit);
+  queryString += `
+  GROUP BY properties.id
+  ORDER BY cost_per_night
+  LIMIT $${values.length};
+  `;
+
+  console.log('queryString', queryString, 'values', values);
+
+  return pool.query(queryString, values).then((results) => results.rows)
+  .catch(err => console.log(err.message));
+  // WHERE city LIKE '%ancouv%'
+  // GROUP BY properties.id, property_reviews.id
+  // HAVING AVG(rating) >= 4
+  // ORDER BY cost_per_night
+  // LIMIT 10;
+  
+  // SELECT *
+  // FROM properties
+  // LIMIT $1
+  // ;
+  return pool.query(queryString, values)
   .then((result) => {
     return result.rows;
   })
