@@ -7,13 +7,13 @@ const pool = new Pool({
   password: '123',
   host: 'localhost',
   database: 'lightbnb'
-})
+});
 
 pool.connect().then(() => {
   console.log('connected');
 })
-.catch(err => {
-  console.log(err)
+  .catch(err => {
+    console.log('err:', err);
 });
 
 /// Users
@@ -71,15 +71,16 @@ const addUser =  function(user) {
   INSERT INTO users (name, email, password)
   VALUES ($1, $2, $3)
   RETURNING *
-  `
+  `;
   const { name, email, password } = user;
   const values = [name, email, password];
-  pool.query(queryString, values)
+  
+  return pool.query(queryString, values)
   .then((result) => {
     return result.rows;
   })
   .catch(err => {
-    console.log(err.message);
+    console.log('err:', err.message);
   })
 }
 exports.addUser = addUser;
@@ -104,7 +105,6 @@ const getAllReservations = function(guest_id, limit = 10) {
 
   return pool.query(queryString, values)
   .then((result) => {
-    console.log('res rows:', result.rows);
     return result.rows
   })
   .catch((err) => {
@@ -143,7 +143,6 @@ const getAllProperties = function(options, limit = 10) {
     values.push(`${options.minimum_price_per_night * 100}`);
     values.push(`${options.maximum_price_per_night * 100}`);
     queryString += ` AND cost_per_night >= $${(values.length - 1)} AND cost_per_night <= $${values.length}`;
-    console.log('money', options.minimum_price_per_night)
   }
   
   if (options.minimum_rating) {
@@ -168,7 +167,7 @@ const getAllProperties = function(options, limit = 10) {
   console.log('queryString', queryString, 'values', values);
 
   return pool.query(queryString, values).then((results) => results.rows)
-  .catch(err => console.log(err.message));
+  .catch(err => console.log('err:', err.message));
 }
 exports.getAllProperties = getAllProperties;
 
@@ -179,9 +178,21 @@ exports.getAllProperties = getAllProperties;
  * @return {Promise<{}>} A promise to the property.
  */
 const addProperty = function(property) {
-  const propertyId = Object.keys(properties).length + 1;
-  property.id = propertyId;
-  properties[propertyId] = property;
-  return Promise.resolve(property);
+  const queryString = `
+  INSERT INTO properties (owner_id, title, description, thumbnail_photo_url, cover_photo_url, cost_per_night, street, city, province, post_code, country, parking_spaces, number_of_bathrooms, number_of_bedrooms)
+  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+  RETURNING *
+  `;
+
+  const { owner_id, title, description, thumbnail_photo_url, cover_photo_url, cost_per_night, street, city, province, post_code, country, parking_spaces, number_of_bathrooms, number_of_bedrooms } = property;
+
+  const values = [owner_id, title, description, thumbnail_photo_url, cover_photo_url, cost_per_night, street, city, province, post_code, country, parking_spaces, number_of_bathrooms, number_of_bedrooms];
+  return pool.query(queryString, values)
+  .then((result) => {
+    return result.rows;
+  })
+  .catch(err => {
+    console.log('err:', err.message);
+  })
 }
 exports.addProperty = addProperty;
