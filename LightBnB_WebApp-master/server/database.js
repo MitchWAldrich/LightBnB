@@ -122,11 +122,10 @@ exports.getAllReservations = getAllReservations;
  * @return {Promise<[{}]>}  A promise to the properties.
  */
 const getAllProperties = function(options, limit = 10) {
-  // const { city, owner_id, minimum_price_per_night, maximum_price_per_night, minimum_rating } = options;
   const values = [];
 
   let queryString = `
-  SELECT properties.*
+  SELECT properties.*, AVG(rating) AS average_rating
   FROM properties
   JOIN property_reviews ON property_id = properties.id
   `;
@@ -141,45 +140,35 @@ const getAllProperties = function(options, limit = 10) {
   }
 
   if (options.minimum_price_per_night && options.maximum_price_per_night) {
-    values.push(`${options.minimum_price_per_night}`);
-    values.push(`${options.maximum_price_per_night}`);
+    values.push(`${options.minimum_price_per_night * 100}`);
+    values.push(`${options.maximum_price_per_night * 100}`);
     queryString += ` AND cost_per_night >= $${(values.length - 1)} AND cost_per_night <= $${values.length}`;
+    console.log('money', options.minimum_price_per_night)
   }
   
   if (options.minimum_rating) {
     values.push(`${parseInt(options.minimum_rating)}`);
-    queryString += ` AND rating >= $${values.length}`;
+    queryString += ` GROUP BY properties.id HAVING AVG(rating) >= $${values.length}`;
+    
+    values.push(limit);
+    queryString += `
+    ORDER BY cost_per_night
+    LIMIT $${values.length};
+    `;
+  } else {
+    values.push(limit);
+    queryString += `
+    GROUP BY properties.id
+    ORDER BY cost_per_night
+    LIMIT $${values.length};
+    `;
   }
 
-  values.push(limit);
-  queryString += `
-  GROUP BY properties.id
-  ORDER BY cost_per_night
-  LIMIT $${values.length};
-  `;
 
   console.log('queryString', queryString, 'values', values);
 
   return pool.query(queryString, values).then((results) => results.rows)
   .catch(err => console.log(err.message));
-  // WHERE city LIKE '%ancouv%'
-  // GROUP BY properties.id, property_reviews.id
-  // HAVING AVG(rating) >= 4
-  // ORDER BY cost_per_night
-  // LIMIT 10;
-  
-  // SELECT *
-  // FROM properties
-  // LIMIT $1
-  // ;
-  return pool.query(queryString, values)
-  .then((result) => {
-    return result.rows;
-  })
-  .catch(err => {
-    console.log(err.message);
-  })
-
 }
 exports.getAllProperties = getAllProperties;
 
